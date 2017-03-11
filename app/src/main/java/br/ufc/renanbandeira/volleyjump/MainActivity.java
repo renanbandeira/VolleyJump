@@ -31,7 +31,8 @@ public class MainActivity extends Activity implements SensorEventListener,
     Sensor accelerometer, gyroscope;
     private Button btnStart, btnStop;
     private boolean started = false;
-    private ArrayList sensorData;
+    private ArrayList accelerometerData;
+    private ArrayList gyroscopeData;
     private DatabaseReference mDatabase;
     String eventID;
 
@@ -40,7 +41,8 @@ public class MainActivity extends Activity implements SensorEventListener,
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        sensorData = new ArrayList();
+        accelerometerData = new ArrayList();
+        gyroscopeData = new ArrayList();
 
         btnStart = (Button) findViewById(R.id.btnStart);
         btnStop = (Button) findViewById(R.id.btnStop);
@@ -77,11 +79,12 @@ public class MainActivity extends Activity implements SensorEventListener,
             SensorData data;
             if (event.sensor.equals(accelerometer)) {
                 data = new AccelData(timestamp, x, y, z);
+                accelerometerData.add(data);
             } else {
                 data = new GyroscopeData(timestamp, x, y, z);
+                gyroscopeData.add(data);
             }
             Log.i("Data", data.toString());
-            sensorData.add(data);
         }
     }
 
@@ -90,10 +93,11 @@ public class MainActivity extends Activity implements SensorEventListener,
         switch (v.getId()) {
             case R.id.btnStart:
                 eventID = UUID.randomUUID().toString();
+                v.setKeepScreenOn(true);
                 btnStart.setEnabled(false);
                 btnStop.setEnabled(true);
-                sensorData = new ArrayList();
-                // save prev data if available
+                accelerometerData.clear();
+                gyroscopeData.clear();
                 started = true;
                 sensorManager.registerListener(this, accelerometer,
                         SensorManager.SENSOR_STATUS_ACCURACY_HIGH);
@@ -104,9 +108,12 @@ public class MainActivity extends Activity implements SensorEventListener,
                 btnStart.setEnabled(true);
                 btnStop.setEnabled(false);
                 started = false;
+                v.setKeepScreenOn(false);
                 sensorManager.unregisterListener(this);
-                mDatabase.child("events").child(eventID).setValue(sensorData);
-                sensorData.clear();
+                mDatabase.child("events").child(eventID).child("acc").setValue(accelerometerData);
+                mDatabase.child("events").child(eventID).child("gyro").setValue(gyroscopeData);
+                accelerometerData.clear();
+                gyroscopeData.clear();
                 eventID = null;
                 break;
             default:
