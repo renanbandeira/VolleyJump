@@ -1,27 +1,17 @@
 package br.ufc.renanbandeira.volleyjump.domain;
 
 
-public abstract class SensorData {
+public class SensorData {
     private long timestamp;
     private double x;
     private double y;
     private double z;
-    protected String type;
 
-    public SensorData(long timestamp, double x, double y, double z, String type) {
+    public SensorData(long timestamp, double x, double y, double z) {
         this.timestamp = timestamp;
         this.x = x;
         this.y = y;
         this.z = z;
-        this.type = type;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
     }
 
     public long getTimestamp() {
@@ -57,6 +47,6 @@ public abstract class SensorData {
     }
 
     public String toString() {
-        return "type=" + type + ", t=" + timestamp + ", x=" + x + ", y=" + y + ", z=" + z;
+        return "t=" + timestamp + ", x=" + x + ", y=" + y + ", z=" + z;
     }
 }
