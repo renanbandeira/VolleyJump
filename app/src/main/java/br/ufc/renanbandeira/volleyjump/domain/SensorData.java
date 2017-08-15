@@ -1,11 +1,19 @@
 package br.ufc.renanbandeira.volleyjump.domain;
 
 
+import com.google.gson.annotations.SerializedName;
+
 public class SensorData {
     private long timestamp;
+
+    @SerializedName("X")
     private double x;
+    @SerializedName("Y")
     private double y;
+    @SerializedName("Z")
     private double z;
+
+    public SensorData() {}
 
     public SensorData(long timestamp, double x, double y, double z) {
         this.timestamp = timestamp;
