@@ -26,6 +26,7 @@ import br.ufc.renanbandeira.volleyjump.domain.SensorTagData;
 
 public class MainActivity extends Activity implements
         OnClickListener, SensorTagListener {
+    private static final int NEXT_STEPS_TO_CHECK_GRAPH = 5;
     private Button btnStart, btnStop;
     private boolean started = false;
     private ArrayList<SensorData> accelerometerData;
@@ -56,35 +57,50 @@ public class MainActivity extends Activity implements
         btnStop.setEnabled(false);
         mDatabase = FirebaseDatabase.getInstance().getReference();
         sensorTag = new SensorTag();
-        sensorTag.setPeriod(50);
+        sensorTag.setPeriod(100);
+    }
+
+    boolean isIncreasing(int currentIndex) {
+        if (accelerometerData.size() > currentIndex + NEXT_STEPS_TO_CHECK_GRAPH) {
+            for (int i = currentIndex + 1; i < currentIndex + NEXT_STEPS_TO_CHECK_GRAPH; i++) {
+                if (accelerometerData.get(i).getY() > accelerometerData.get(currentIndex).getY()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    boolean isDecreasing(int currentIndex) {
+        if (accelerometerData.size() > currentIndex + NEXT_STEPS_TO_CHECK_GRAPH) {
+            for (int i = currentIndex + 1; i < currentIndex + NEXT_STEPS_TO_CHECK_GRAPH; i++) {
+                if (accelerometerData.get(i).getY() < accelerometerData.get(currentIndex).getY()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void analyzeData() {
         for(int i = 0; i < accelerometerData.size(); i++) {
             double y = accelerometerData.get(i).getY();
             long timestamp = accelerometerData.get(i).getTimestamp();
-            if ( y < 0 && !isJumping && maxValue > 0) {
+            if (!isJumping && isIncreasing(i)) {
                 isJumping = true;
-            }
-            if (isJumping) {
-                if (y < minValue) {
-                    minValue = y;
-                    minValueTimestamp = timestamp;
-                } else if (y > minValue) {
-                    finishJump();
-                }
-            } else {
-                if (y > maxValue) {
-                    maxValue = y;
-                    maxValueTimestamp = timestamp;
-                }
+                minValue = y;
+                minValueTimestamp = timestamp;
+            } else if (isJumping && isDecreasing(i)) {
+                maxValue = y;
+                maxValueTimestamp = timestamp;
+                finishJump();
             }
         }
     }
 
     void finishJump() {
         isJumping = false;
-        float dt = ((float) (minValueTimestamp - maxValueTimestamp))/1000;
+        float dt = ((float) (minValueTimestamp - maxValueTimestamp));
         double da = minValue + maxValue;
         Log.d("MIN_MAX", "" + minValue);
         Log.d("MAX_MIN", "" + maxValue);
@@ -93,7 +109,7 @@ public class MainActivity extends Activity implements
         Log.d("MAX_MIN_DT_TIMESTAMP", "" + dt);
         int height = (int) ((da*dt*dt*100));
         minValue = 50;
-        maxValue = -1;
+        maxValue = -100;
         maxValueTimestamp = 0;
         minValueTimestamp = 0;
         Log.e("Height", "" + height);
@@ -111,7 +127,6 @@ public class MainActivity extends Activity implements
                 Calendar cal = Calendar.getInstance();
                 SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yy--HH-mm-ss-SSS");
                 eventID = sdf.format(cal.getTime());
-                v.setKeepScreenOn(true);
                 btnStart.setEnabled(false);
                 btnStop.setEnabled(true);
                 accelerometerData.clear();
@@ -127,8 +142,8 @@ public class MainActivity extends Activity implements
                 v.setKeepScreenOn(false);
                 Log.e("Event", eventID);
                 analyzeData();
-                //mDatabase.child("events").child(eventID).child("acc").setValue(accelerometerData);
-                //mDatabase.child("events").child(eventID).child("gyro").setValue(gyroscopeData);
+                mDatabase.child("events").child(eventID).child("acc").setValue(accelerometerData);
+                mDatabase.child("events").child(eventID).child("gyro").setValue(gyroscopeData);
                 //mDatabase.child("events").child(eventID).child("heights").setValue(jumpsHeight);
 
                 accelerometerData.clear();
@@ -144,6 +159,7 @@ public class MainActivity extends Activity implements
 
     @Override
     public void onSensorTagUpdate(String s) {
+        Log.d("SENSOR", s);
         if (started) {
             Gson gson = new Gson();
             long timestamp = System.currentTimeMillis();
@@ -156,7 +172,7 @@ public class MainActivity extends Activity implements
                 gyroscopeData.add(gyroscope);
             }
             if (accelerometer != null) {
-                accelerometer.setY(accelerometer.getY() / 3.1 + 1.1);
+                accelerometer.setY(accelerometer.getY() / 1000);
                 accelerometer.setTimestamp(timestamp);
                 accelerometerData.add(accelerometer);
                 Log.i("AccelData", accelerometer.toString());
