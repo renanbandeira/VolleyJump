@@ -27,6 +27,8 @@ import br.ufc.renanbandeira.volleyjump.domain.SensorTagData;
 public class MainActivity extends Activity implements
         OnClickListener, SensorTagListener {
     private static final int NEXT_STEPS_TO_CHECK_GRAPH = 5;
+    private static final double THRESHOLD = 0.01;
+    private static boolean hasConnectedBefore = false;
     private Button btnStart, btnStop;
     private boolean started = false;
     private ArrayList<SensorData> accelerometerData;
@@ -63,7 +65,7 @@ public class MainActivity extends Activity implements
     boolean isIncreasing(int currentIndex) {
         if (accelerometerData.size() > currentIndex + NEXT_STEPS_TO_CHECK_GRAPH) {
             for (int i = currentIndex + 1; i < currentIndex + NEXT_STEPS_TO_CHECK_GRAPH; i++) {
-                if (accelerometerData.get(i).getY() > accelerometerData.get(currentIndex).getY()) {
+                if (accelerometerData.get(i).getY() + THRESHOLD > accelerometerData.get(currentIndex).getY()) {
                     return true;
                 }
             }
@@ -74,7 +76,7 @@ public class MainActivity extends Activity implements
     boolean isDecreasing(int currentIndex) {
         if (accelerometerData.size() > currentIndex + NEXT_STEPS_TO_CHECK_GRAPH) {
             for (int i = currentIndex + 1; i < currentIndex + NEXT_STEPS_TO_CHECK_GRAPH; i++) {
-                if (accelerometerData.get(i).getY() < accelerometerData.get(currentIndex).getY()) {
+                if (accelerometerData.get(i).getY() - THRESHOLD < accelerometerData.get(currentIndex).getY()) {
                     return true;
                 }
             }
@@ -132,13 +134,16 @@ public class MainActivity extends Activity implements
                 accelerometerData.clear();
                 gyroscopeData.clear();
                 started = true;
-                sensorTag.start(this, this);
+                if (sensorTag != null) {
+                    sensorTag.start(this, this);
+                }
                 break;
             case R.id.btnStop:
                 sensorTag.stop();
                 btnStart.setEnabled(true);
                 btnStop.setEnabled(false);
                 started = false;
+                hasConnectedBefore = false;
                 v.setKeepScreenOn(false);
                 Log.e("Event", eventID);
                 analyzeData();
