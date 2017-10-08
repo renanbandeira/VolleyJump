@@ -1,7 +1,10 @@
 package br.ufc.renanbandeira.volleyjump;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.os.Bundle;
@@ -9,6 +12,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.firebase.database.DatabaseReference;
@@ -100,7 +104,24 @@ public class MainActivity extends Activity implements
         }
     }
 
+    void askForJumpHeight() {
+        final EditText height = new EditText(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(height);
+        builder.setTitle("Digite a altura do salto");
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                mDatabase.child("events").child(eventID).child("height").setValue(height.getText().toString());
+                eventID = null;
+            }
+        });
+        builder.create().show();
+
+    }
+
     void finishJump() {
+
         isJumping = false;
         float dt = ((float) (minValueTimestamp - maxValueTimestamp));
         double da = minValue + maxValue;
@@ -150,11 +171,11 @@ public class MainActivity extends Activity implements
                 mDatabase.child("events").child(eventID).child("acc").setValue(accelerometerData);
                 mDatabase.child("events").child(eventID).child("gyro").setValue(gyroscopeData);
                 //mDatabase.child("events").child(eventID).child("heights").setValue(jumpsHeight);
-
+                askForJumpHeight();
                 accelerometerData.clear();
                 gyroscopeData.clear();
                 jumpsHeight.clear();
-                eventID = null;
+
                 break;
             default:
                 break;
