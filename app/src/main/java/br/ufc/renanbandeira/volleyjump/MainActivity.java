@@ -6,13 +6,17 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.support.annotation.IdRes;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import com.google.firebase.database.DatabaseReference;
@@ -29,10 +33,12 @@ import br.ufc.renanbandeira.volleyjump.domain.SensorData;
 import br.ufc.renanbandeira.volleyjump.domain.SensorTagData;
 
 public class MainActivity extends Activity implements
-        OnClickListener, SensorTagListener {
+        OnClickListener, SensorTagListener, SensorEventListener {
     private static final int NEXT_STEPS_TO_CHECK_GRAPH = 5;
     private static final double THRESHOLD = 0.01;
     private static boolean hasConnectedBefore = false;
+    private SensorManager sensorManager;
+    Sensor accelerometer, gyroscope;
     private Button btnStart, btnStop;
     private boolean started = false;
     private ArrayList<SensorData> accelerometerData;
@@ -46,11 +52,13 @@ public class MainActivity extends Activity implements
     long minValueTimestamp;
     boolean isJumping;
     SensorTag sensorTag;
+    int jumpType = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometerData = new ArrayList<>();
         gyroscopeData = new ArrayList<>();
         jumpsHeight = new ArrayList<>();
@@ -62,8 +70,20 @@ public class MainActivity extends Activity implements
         btnStart.setEnabled(true);
         btnStop.setEnabled(false);
         mDatabase = FirebaseDatabase.getInstance().getReference();
-        sensorTag = new SensorTag();
-        sensorTag.setPeriod(100);
+        // sensorTag = new SensorTag();
+        // sensorTag.setPeriod(100);
+        accelerometer = sensorManager
+                .getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (started) {
+            sensorManager.unregisterListener(this);
+        }
     }
 
     boolean isIncreasing(int currentIndex) {
@@ -105,19 +125,32 @@ public class MainActivity extends Activity implements
     }
 
     void askForJumpHeight() {
-        final EditText height = new EditText(this);
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(height);
-        builder.setTitle("Digite a altura do salto");
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+        final Dialog dialog = new Dialog(this);
+        dialog.setContentView(R.layout.jump_result_dialog);
+
+        dialog.setTitle("Digite a altura do salto");
+        ((RadioGroup) dialog.findViewById(R.id.jump_type)).setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-                mDatabase.child("events").child(eventID).child("height").setValue(height.getText().toString());
-                eventID = null;
+            public void onCheckedChanged(RadioGroup radioGroup, @IdRes int i) {
+               if (i == R.id.jump_atack) {
+                   jumpType = 0;
+               } else {
+                   jumpType = 1;
+               }
             }
         });
-        builder.create().show();
-
+        (dialog.findViewById(R.id.submit)).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                EditText height = (EditText) dialog.findViewById(R.id.jump_height);
+                mDatabase.child("events").child(eventID).child("height").setValue(height.getText().toString());
+                mDatabase.child("events").child(eventID).child("type").setValue(jumpType);
+                jumpType = 0;
+                eventID = null;
+                dialog.dismiss();
+            }
+        });
+        dialog.show();
     }
 
     void finishJump() {
@@ -156,21 +189,31 @@ public class MainActivity extends Activity implements
                 gyroscopeData.clear();
                 started = true;
                 if (sensorTag != null) {
-                    sensorTag.start(this, this);
+                    // sensorTag.start(this, this);
                 }
+                sensorManager.registerListener(this, accelerometer,
+                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH);
+                sensorManager.registerListener(this, gyroscope,
+                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH);
                 break;
             case R.id.btnStop:
-                sensorTag.stop();
+                if (sensorTag != null) {
+                    sensorTag.stop();
+                }
                 btnStart.setEnabled(true);
                 btnStop.setEnabled(false);
                 started = false;
                 hasConnectedBefore = false;
                 v.setKeepScreenOn(false);
                 Log.e("Event", eventID);
+                if (accelerometerData.isEmpty() && gyroscopeData.isEmpty()) {
+                    break;
+                }
                 analyzeData();
                 mDatabase.child("events").child(eventID).child("acc").setValue(accelerometerData);
                 mDatabase.child("events").child(eventID).child("gyro").setValue(gyroscopeData);
                 //mDatabase.child("events").child(eventID).child("heights").setValue(jumpsHeight);
+                sensorManager.unregisterListener(this);
                 askForJumpHeight();
                 accelerometerData.clear();
                 gyroscopeData.clear();
@@ -185,6 +228,15 @@ public class MainActivity extends Activity implements
 
     @Override
     public void onSensorTagUpdate(String s) {
+        if (!hasConnectedBefore) {
+            hasConnectedBefore = true;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this, "Pode saltar!", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         Log.d("SENSOR", s);
         if (started) {
             Gson gson = new Gson();
@@ -198,12 +250,33 @@ public class MainActivity extends Activity implements
                 gyroscopeData.add(gyroscope);
             }
             if (accelerometer != null) {
-                accelerometer.setY(accelerometer.getY() / 1000);
                 accelerometer.setTimestamp(timestamp);
                 accelerometerData.add(accelerometer);
                 Log.i("AccelData", accelerometer.toString());
             }
 
         }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (started) {
+            double x = event.values[0];
+            double y = event.values[1];
+            double z = event.values[2];
+            long timestamp = System.currentTimeMillis();
+            SensorData data = new SensorData(timestamp, x, y, z);
+            if (event.sensor.equals(accelerometer)) {
+                accelerometerData.add(data);
+            } else if (event.sensor.equals(gyroscope)){
+                gyroscopeData.add(data);
+            }
+            Log.i("Data", data.toString());
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
     }
 }
