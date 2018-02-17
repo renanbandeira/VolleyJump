@@ -1,5 +1,6 @@
 package br.ufc.renanbandeira.volleyjump;
 
+import android.*;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -22,10 +23,16 @@ import android.widget.Toast;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.gson.Gson;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.MultiplePermissionsReport;
+import com.karumi.dexter.PermissionToken;
+import com.karumi.dexter.listener.PermissionRequest;
+import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 import br.ufc.great.sensortag.SensorTag;
 import br.ufc.great.sensortag.callbacks.SensorTagListener;
@@ -57,6 +64,18 @@ public class MainActivity extends Activity implements
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Dexter.withActivity(this)
+                .withPermissions(
+                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                ).withListener(new MultiplePermissionsListener() {
+            @Override public void onPermissionsChecked(MultiplePermissionsReport report) {/* ... */}
+
+            @Override
+            public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
+
+            }
+        }).check();
         setContentView(R.layout.activity_main);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometerData = new ArrayList<>();
